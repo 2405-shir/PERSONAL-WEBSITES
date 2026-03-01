@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Apple Sync Planner</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #000000;
+            --sub: #8e8e93;
+            --priority-red: #ff3b30;
+            --apple-blue: #007aff;
+            --system-gray: #f2f2f7;
+            --border: #e5e5ea;
+            --apple-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        html { font-size: 16px; }
+
+        body {
+            font-family: var(--apple-font);
+            background: var(--bg);
+            color: var(--text);
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px 16px;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.4;
+            font-size: 15px;
+            overflow-x: hidden;
+            min-height: 100dvh;
+        }
+
+        /* ── Navigation ── */
+        .nav-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            border-bottom: 0.5px solid #d1d1d6;
+            padding-bottom: 12px;
+            gap: 12px;
+        }
+        .nav-group {
+            display: flex; gap: 14px; align-items: center;
+            flex-wrap: nowrap; overflow-x: auto;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            flex: 1; min-width: 0;
+        }
+        .nav-group::-webkit-scrollbar { display: none; }
+        .nav-item {
+            font-weight: 700; font-size: clamp(22px,6vw,32px);
+            cursor: pointer; color: #c7c7cc; transition: color 0.2s;
+            letter-spacing: -0.5px; white-space: nowrap; flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .nav-item.active { color: var(--text); }
+        .nav-actions { display: flex; gap: 2px; flex-shrink: 0; }
+        .icon-btn {
+            cursor: pointer; color: #8e8e93; border: none; background: none;
+            padding: 8px; border-radius: 10px; -webkit-tap-highlight-color: transparent;
+            min-width: 40px; min-height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s;
+        }
+        .icon-btn:active { background: var(--system-gray); }
+
+        /* ── Daily Controls ── */
+        #daily-controls { margin-bottom: 24px; display: none; }
+        .date-row { display: flex; gap: 10px; margin-bottom: 12px; }
+        #date-picker {
+            border: none; padding: 12px 14px; font-weight: 500;
+            font-size: 15px; font-family: inherit; flex: 1;
+            background: var(--system-gray); border-radius: 10px; min-width: 0;
+            -webkit-appearance: none; appearance: none;
+        }
+        .today-btn {
+            background: var(--text); color: #fff; border: none;
+            padding: 0 18px; font-weight: 600; font-size: 14px;
+            cursor: pointer; border-radius: 10px; white-space: nowrap;
+            flex-shrink: 0; min-height: 44px; font-family: inherit;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .today-btn:active { opacity: 0.7; }
+
+        /* ── Progress Bar ── */
+        .progress-bg {
+            width: 100%; height: 30px; background: var(--system-gray);
+            border-radius: 8px; position: relative; overflow: hidden;
+        }
+        #progress-fill {
+            height: 100%; width: 0%; border-radius: 8px;
+            transition: width 0.5s cubic-bezier(0.4,0,0.2,1), background-color 0.3s ease;
+        }
+        #progress-text {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 800; color: #000;
+            mix-blend-mode: difference; filter: invert(1); pointer-events: none;
+        }
+
+        /* ── Views ── */
+        .view-container { display: none; }
+        .view-container.active { display: block; }
+        .day-section { margin-bottom: 28px; }
+        .day-header {
+            border-bottom: 1.5px solid var(--text);
+            padding-bottom: 6px; display: flex; align-items: center;
+            gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+        }
+        .day-name {
+            font-weight: 700; text-transform: uppercase;
+            font-size: clamp(16px,4.5vw,21px); letter-spacing: 0.05em;
+            flex: 1; min-width: 120px;
+        }
+        .occasion-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 11px; font-weight: 600; padding: 3px 8px;
+            border-radius: 20px; white-space: nowrap;
+            max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* ── Tasks ── */
+        .task-item {
+            display: flex; align-items: center;
+            padding: 12px 0; border-bottom: 0.5px solid var(--border);
+            gap: 12px; min-height: 48px; position: relative;
+        }
+        .task-item.priority { border-left: 4px solid var(--priority-red); padding-left: 12px; font-weight: 600; }
+        .task-item.checked { opacity: 0.35; }
+        .task-item.recurring-task::after { display: none; }
+
+        /* Recurring button — blue when active */
+        .recur-btn { color: #d1d1d6; }
+        .recur-btn.active { color: var(--apple-blue); }
+
+        /* ── Custom circle checkbox ── */
+        input[type="checkbox"] { display: none; }
+        .circle-check {
+            width: 24px; height: 24px; min-width: 24px;
+            border-radius: 50%;
+            border: 2px solid #c7c7cc;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0;
+            transition: border-color 0.18s, background 0.18s, transform 0.12s;
+            -webkit-tap-highlight-color: transparent;
+            background: transparent;
+            user-select: none;
+        }
+        .circle-check:active { transform: scale(0.86); }
+        .circle-check.is-priority { border-color: var(--priority-red); }
+        .circle-check.is-checked { background: var(--text); border-color: var(--text); }
+        .circle-check.is-priority.is-checked { background: var(--priority-red); border-color: var(--priority-red); }
+        .circle-check svg { opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+        .circle-check.is-checked svg { opacity: 1; }
+
+        .task-content { flex-grow: 1; cursor: pointer; font-size: 15px; min-width: 0; word-break: break-word; }
+        .task-text.crossed { text-decoration: line-through; }
+        .delete-btn {
+            color: #d1d1d6; border: none; background: none;
+            cursor: pointer; padding: 8px; min-width: 36px; min-height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .delete-btn:active { background: #ffeaea; color: var(--priority-red); }
+
+        .add-input {
+            width: 100%; border: none; border-bottom: 1px dashed #d1d1d6;
+            padding: 12px 0; outline: none; background: transparent;
+            font-size: 15px; font-family: inherit; min-height: 44px;
+        }
+        .add-input::placeholder { color: #c7c7cc; }
+
+        /* shortcut hint that appears while typing /r */
+        .shortcut-hint {
+            font-size: 11px; color: var(--priority-red); font-weight: 600;
+            padding: 3px 0 6px; display: none; letter-spacing: 0.02em;
+        }
+
+        /* ── Overlays ── */
+        .overlay {
+            display: none; position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.98);
+            z-index: 100; flex-direction: column;
+            padding: 60px 24px 40px;
+            box-sizing: border-box; overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        @supports (padding-top: env(safe-area-inset-top)) {
+            .overlay { padding-top: calc(60px + env(safe-area-inset-top)); padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+            body { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+        }
+        .btn-action {
+            margin-top: 12px; background: var(--text); color: #fff;
+            border: none; padding: 16px; cursor: pointer; width: 100%;
+            font-weight: 600; font-size: 16px; border-radius: 14px;
+            font-family: inherit; min-height: 52px;
+            -webkit-tap-highlight-color: transparent; transition: opacity 0.15s;
+        }
+        .btn-action:active { opacity: 0.75; }
+
+        /* ── Bottom Sheet (Recurring) ── */
+        .bottom-sheet-bg {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.35); z-index: 200;
+        }
+        .bottom-sheet-bg.open { display: block; }
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+            width: 100%; max-width: 600px;
+            background: #fff; border-radius: 20px 20px 0 0;
+            padding: 20px 24px 40px;
+            box-shadow: 0 -4px 30px rgba(0,0,0,0.12);
+            z-index: 201;
+            transform: translateX(-50%) translateY(100%);
+            transition: transform 0.32s cubic-bezier(0.32,0,0,1);
+        }
+        .bottom-sheet.open { transform: translateX(-50%) translateY(0); }
+        .sheet-handle {
+            width: 36px; height: 4px; background: #d1d1d6;
+            border-radius: 2px; margin: 0 auto 20px;
+        }
+        .sheet-title { font-weight: 800; font-size: 20px; margin-bottom: 6px; }
+        .sheet-task-name {
+            font-size: 14px; color: var(--sub);
+            margin-bottom: 20px; word-break: break-word;
+        }
+        .recur-label {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.07em; color: var(--sub); margin-bottom: 10px; display: block;
+        }
+        .recur-options {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            margin-bottom: 20px;
+        }
+        .recur-opt {
+            padding: 10px 6px; border-radius: 12px; border: 1.5px solid var(--border);
+            background: var(--system-gray); font-size: 13px; font-weight: 600;
+            text-align: center; cursor: pointer; transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .recur-opt.selected { background: var(--text); color: #fff; border-color: var(--text); }
+        .recur-until-row { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
+        .recur-until-label { font-size: 13px; color: var(--sub); white-space: nowrap; }
+        .recur-until-input {
+            flex: 1; border: none; background: var(--system-gray);
+            border-radius: 10px; padding: 10px 12px;
+            font-size: 14px; font-family: inherit; outline: none;
+            -webkit-appearance: none; appearance: none;
+        }
+        .recur-until-input:focus { outline: 2px solid var(--apple-blue); }
+        .sheet-actions { display: flex; gap: 10px; }
+        .sheet-btn {
+            flex: 1; padding: 14px; border-radius: 14px; border: none;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            font-family: inherit; -webkit-tap-highlight-color: transparent;
+            transition: opacity 0.15s;
+        }
+        .sheet-btn:active { opacity: 0.7; }
+        .sheet-btn.primary { background: var(--text); color: #fff; }
+        .sheet-btn.secondary { background: var(--system-gray); color: var(--text); }
+        .sheet-btn.danger { background: none; color: var(--priority-red); border: 1.5px solid var(--priority-red); }
+
+        .history-row { font-size: 14px; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
+        .hist-type { font-weight: 700; text-transform: uppercase; font-size: 10px; color: var(--sub); }
+        h2 { font-weight: 800; font-size: clamp(24px,7vw,32px); margin-bottom: 20px; margin-top: 0; }
+        #modal-task-text { font-size: clamp(20px,5.5vw,26px); font-weight: 700; margin-bottom: 28px; outline: none; word-break: break-word; }
+
+        /* ── Settings ── */
+        .settings-section-label {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.08em; color: var(--sub); margin: 24px 0 6px;
+        }
+
+        /* ── Occasions ── */
+        .occasion-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
+        .occasion-icon-pill { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        .occasion-info { flex: 1; min-width: 0; }
+        .occasion-name { font-weight: 600; font-size: 15px; }
+        .occasion-meta { font-size: 12px; color: var(--sub); margin-top: 2px; }
+        .form-group { margin-bottom: 16px; }
+        .form-label { font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; display: block; }
+        .form-input { width: 100%; border: none; background: var(--system-gray); border-radius: 10px; padding: 12px 14px; font-size: 15px; font-family: inherit; outline: none; -webkit-appearance: none; appearance: none; }
+        .form-input:focus { outline: 2px solid var(--apple-blue); }
+        .type-opt {
+            flex: 1; padding: 9px 4px; border-radius: 10px;
+            border: 1.5px solid var(--border); background: var(--system-gray);
+            font-size: 12px; font-weight: 600; text-align: center;
+            cursor: pointer; transition: all 0.15s; white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .type-opt.selected { background: var(--text); color: #fff; border-color: var(--text); }
+        .icon-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+        .icon-option { width: 44px; height: 44px; border-radius: 12px; border: 2px solid transparent; background: var(--system-gray); font-size: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: border-color 0.15s, background 0.15s; }
+        .icon-option.selected { border-color: var(--apple-blue); background: #e8f0fe; }
+        .color-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+        .color-option { width: 36px; height: 36px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: border-color 0.15s, transform 0.15s; }
+        .color-option.selected { border-color: #000; transform: scale(1.15); }
+
+        /* ── Balloons ── */
+        .balloon { position: fixed; width: 22px; height: 28px; border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; z-index: 1000; bottom: -60px; pointer-events: none; }
+        .balloon::after { content: ""; position: absolute; bottom: -15px; left: 50%; width: 1px; height: 15px; background: rgba(0,0,0,0.2); }
+
+        /* ── Pop particle ── */
+        .pop-particle { position: fixed; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; z-index: 999; }
+
+        /* ── Responsive ── */
+        @media (max-width: 400px) {
+            body { padding: 14px 12px; }
+            .nav-item { font-size: 20px; }
+            .overlay { padding: 44px 16px 30px; }
+            .task-item { gap: 10px; }
+            .recur-options { grid-template-columns: repeat(2,1fr); }
+        }
+        @media (min-width: 600px) { body { padding: 32px 24px; } }
+        @media (hover: hover) {
+            .delete-btn:hover { color: var(--priority-red); }
+            .nav-item:hover { color: #555; }
+            .icon-btn:hover { background: var(--system-gray); }
+            .recur-opt:hover:not(.selected) { border-color: #aaa; }
+        }
+        #import-file-input { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="nav-header">
+        <div class="nav-group">
+            <div class="nav-item active" onclick="switchView('weekly', this)">Weekly</div>
+            <div class="nav-item" onclick="switchView('daily', this)">Daily</div>
+            <div class="nav-item" onclick="switchView('monthly', this)">Monthly</div>
+        </div>
+        <div class="nav-actions">
+            <button class="icon-btn" onclick="toggleOverlay('occasions-overlay')" title="Birthdays & Anniversaries">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                    <line x1="9" y1="1" x2="9" y2="4"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
+                </svg>
+            </button>
+            <button class="icon-btn" onclick="toggleOverlay('history-overlay')" title="Activity Log">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+            </button>
+            <button class="icon-btn" onclick="toggleOverlay('settings-overlay')" title="Settings">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="daily-controls">
+        <div class="date-row">
+            <input type="date" id="date-picker" onchange="renderAll()">
+            <button class="today-btn" onclick="setToday()">Today</button>
+        </div>
+        <div class="progress-bg">
+            <div id="progress-text">0%</div>
+            <div id="progress-fill"></div>
+        </div>
+    </div>
+
+    <div id="weekly-view"  class="view-container active"></div>
+    <div id="daily-view"   class="view-container"></div>
+    <div id="monthly-view" class="view-container"></div>
+
+    <!-- History -->
+    <div id="history-overlay" class="overlay">
+        <h2>Activity Log</h2>
+        <div id="history-list"></div>
+        <button class="btn-action" style="background:var(--system-gray);color:var(--text);margin-top:30px;" onclick="toggleOverlay('history-overlay')">Close</button>
+    </div>
+
+    <!-- Edit Task -->
+    <div id="edit-overlay" class="overlay">
+        <div id="modal-task-text" contenteditable="true"></div>
+        <button class="btn-action" style="background:var(--priority-red);margin-bottom:12px;" onclick="applyQuickRed()">SET PRIORITY</button>
+        <button class="btn-action" onclick="closeEditModal()">Done</button>
+    </div>
+
+    <!-- Settings -->
+    <div id="settings-overlay" class="overlay">
+        <h2>Settings</h2>
+        <div class="settings-section-label">Data</div>
+        <button onclick="exportData()" class="btn-action" style="margin-top:0;">Export JSON Backup</button>
+        <button onclick="triggerImport()" class="btn-action" style="background:var(--system-gray);color:var(--text);">Import JSON Backup</button>
+        <input type="file" id="import-file-input" accept=".json,application/json" onchange="importData(event)">
+        <p id="import-status" style="font-size:13px;text-align:center;margin:8px 0 0;min-height:20px;"></p>
+        <div class="settings-section-label" style="margin-top:28px;">Danger Zone</div>
+        <button class="btn-action" style="background:none;color:var(--priority-red);border:1.5px solid var(--priority-red);" onclick="clearAllData()">Clear All Data</button>
+        <button class="btn-action" style="background:none;color:var(--sub);border:1.5px solid var(--border);margin-top:20px;" onclick="toggleOverlay('settings-overlay')">Close</button>
+    </div>
+
+    <!-- Occasions -->
+    <div id="occasions-overlay" class="overlay">
+        <h2>Birthdays &amp; Anniversaries</h2>
+        <div id="occasions-list"></div>
+        <div id="occasion-form" style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+            <div style="font-weight:700;font-size:17px;margin-bottom:16px;" id="occasion-form-title">Add New</div>
+            <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="occ-name" type="text" placeholder="e.g. Mum, Wedding Anniversary"></div>
+            <div class="form-group">
+                <label class="form-label">Type</label>
+                <div style="display:flex;gap:8px;margin-top:4px;">
+                    <div class="type-opt selected" data-val="birthday" onclick="selectOccType(this)">🎂 Birthday</div>
+                    <div class="type-opt" data-val="anniversary" onclick="selectOccType(this)">💍 Anniversary</div>
+                    <div class="type-opt" data-val="other" onclick="selectOccType(this)">🎉 Other</div>
+                </div>
+            </div>
+            <div class="form-group"><label class="form-label">Date</label><input class="form-input" id="occ-date" type="date"></div>
+            <div class="form-group" id="occ-year-group"><label class="form-label">Year <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--sub);">— for age/years calculation</span></label><input class="form-input" id="occ-year" type="number" min="1900" max="2099" placeholder="e.g. 1990 (optional)"></div>
+            <div class="form-group"><label class="form-label">Icon</label><div class="icon-picker" id="occ-icon-picker"></div></div>
+            <div class="form-group"><label class="form-label">Color</label><div class="color-picker" id="occ-color-picker"></div></div>
+            <button class="btn-action" style="margin-top:8px;" onclick="saveOccasion()">Save</button>
+            <button class="btn-action" style="background:var(--system-gray);color:var(--text);" onclick="cancelOccasionEdit()">Cancel</button>
+        </div>
+        <button class="btn-action" style="background:none;color:var(--sub);border:1.5px solid var(--border);margin-top:12px;" onclick="toggleOverlay('occasions-overlay')">Close</button>
+    </div>
+
+    <!-- ── Recurring Task Bottom Sheet ── -->
+    <div class="bottom-sheet-bg" id="recur-bg" onclick="closeRecurSheet()"></div>
+    <div class="bottom-sheet" id="recur-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">Repeat Task</div>
+        <div class="sheet-task-name" id="recur-task-name"></div>
+
+        <span class="recur-label">Repeat every</span>
+        <div class="recur-options" id="recur-options">
+            <div class="recur-opt" data-val="daily">Daily</div>
+            <div class="recur-opt" data-val="weekdays">Weekdays</div>
+            <div class="recur-opt" data-val="weekly">Weekly</div>
+            <div class="recur-opt" data-val="biweekly">Every 2 wks</div>
+            <div class="recur-opt" data-val="monthly">Monthly</div>
+            <div class="recur-opt" data-val="none">Don't repeat</div>
+        </div>
+
+        <div class="recur-until-row">
+            <span class="recur-until-label">Until</span>
+            <input type="date" class="recur-until-input" id="recur-until">
+        </div>
+
+        <div class="sheet-actions">
+            <button class="sheet-btn secondary" onclick="closeRecurSheet()">Cancel</button>
+            <button class="sheet-btn primary" onclick="saveRecurring()">Save</button>
+        </div>
+        <button class="sheet-btn danger" id="recur-remove-btn" style="width:100%;margin-top:10px;display:none;" onclick="removeRecurring()">Remove Recurring</button>
+    </div>
+
+    <script>
+    // ═══════════════════════════════════
+    //  STATE
+    // ═══════════════════════════════════
+    let tasks     = JSON.parse(localStorage.getItem('tweekSyncTasks'))     || [];
+    let history   = JSON.parse(localStorage.getItem('tweekSyncHistory'))   || [];
+    let occasions = JSON.parse(localStorage.getItem('tweekSyncOccasions')) || [];
+    let recurTemplates = JSON.parse(localStorage.getItem('tweekRecurTemplates')) || [];
+    // recurTemplates: [{id, text, color, recur:'daily'|'weekdays'|'weekly'|'biweekly'|'monthly', startDate, until}]
+
+    let lastPercent   = 0;
+    let currentTaskId = null;
+    let editingOccId  = null;
+    let currentView   = 'weekly';
+    let recurTaskId   = null;   // task id being configured for recurrence
+
+    const OCC_ICONS  = ['🎂','🎉','💍','🌸','❤️','🥂','🎈','⭐','🌟','🎁','🌹','🏆'];
+    const OCC_COLORS = ['#ff3b30','#ff9500','#ffcc00','#34c759','#007aff','#5856d6','#af52de','#ff2d55','#000000','#636366'];
+    let selIcon  = OCC_ICONS[0];
+    let selColor = OCC_COLORS[0];
+
+    // ═══════════════════════════════════
+    //  BUBBLE POP — crisp membrane model
+    // ═══════════════════════════════════
+    function playBubblePop(cx, cy) {
+        // Visual particles
+        const palette = ['#ff3b30','#ff9500','#34c759','#007aff','#af52de','#ffcc00','#ff2d55'];
+        for (let i = 0; i < 9; i++) {
+            const p = document.createElement('div');
+            p.className = 'pop-particle';
+            p.style.cssText = `left:${cx}px;top:${cy}px;background:${palette[i%palette.length]}`;
+            document.body.appendChild(p);
+            const angle = (i/9)*Math.PI*2, dist = 28+Math.random()*28;
+            p.animate([
+                {transform:'translate(-50%,-50%) scale(1.2)',opacity:1},
+                {transform:`translate(calc(-50% + ${Math.cos(angle)*dist}px),calc(-50% + ${Math.sin(angle)*dist}px)) scale(0)`,opacity:0}
+            ],{duration:380,easing:'ease-out'}).onfinish = ()=>p.remove();
+        }
+        // Audio
+        try {
+            const ctx = new (window.AudioContext||window.webkitAudioContext)();
+            const t0 = ctx.currentTime;
+            // Click transient
+            const cLen = Math.floor(ctx.sampleRate*0.004);
+            const cBuf = ctx.createBuffer(1,cLen,ctx.sampleRate);
+            const cData = cBuf.getChannelData(0);
+            for (let i=0;i<cLen;i++) cData[i]=(Math.random()*2-1)*(1-i/cLen);
+            const click = ctx.createBufferSource(); click.buffer=cBuf;
+            const cg=ctx.createGain(); cg.gain.setValueAtTime(1.2,t0); cg.gain.exponentialRampToValueAtTime(0.001,t0+0.004);
+            click.connect(cg); cg.connect(ctx.destination); click.start(t0); click.stop(t0+0.004);
+            // Membrane partials (pitch drop)
+            [[180,0.5,0.07],[320,0.28,0.045]].forEach(([freq,amp,dur])=>{
+                const o=ctx.createOscillator(), g=ctx.createGain();
+                o.type='sine';
+                o.frequency.setValueAtTime(freq*2.4,t0);
+                o.frequency.exponentialRampToValueAtTime(freq,t0+dur*0.25);
+                g.gain.setValueAtTime(amp,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+                o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0+dur);
+            });
+            // Air whoosh (highpass noise)
+            const wLen=Math.floor(ctx.sampleRate*0.03), wBuf=ctx.createBuffer(1,wLen,ctx.sampleRate);
+            const wData=wBuf.getChannelData(0);
+            for (let i=0;i<wLen;i++) wData[i]=(Math.random()*2-1)*Math.pow(1-i/wLen,2.5);
+            const whoosh=ctx.createBufferSource(); whoosh.buffer=wBuf;
+            const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=3200;
+            const wg=ctx.createGain(); wg.gain.setValueAtTime(0.5,t0); wg.gain.exponentialRampToValueAtTime(0.001,t0+0.03);
+            whoosh.connect(hpf); hpf.connect(wg); wg.connect(ctx.destination); whoosh.start(t0); whoosh.stop(t0+0.03);
+        } catch(e){}
+    }
+
+    // ═══════════════════════════════════
+    //  UTILS
+    // ═══════════════════════════════════
+    function formatDate(d) {
+        return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+    function logAction(action,text,date) {
+        const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+        history.unshift({action,text,date,time}); if(history.length>50)history.pop(); save();
+    }
+    function save() {
+        localStorage.setItem('tweekSyncTasks',     JSON.stringify(tasks));
+        localStorage.setItem('tweekSyncHistory',   JSON.stringify(history));
+        localStorage.setItem('tweekSyncOccasions', JSON.stringify(occasions));
+        localStorage.setItem('tweekRecurTemplates',JSON.stringify(recurTemplates));
+    }
+
+    // ═══════════════════════════════════
+    //  RECURRING — inject tasks for visible range
+    // ═══════════════════════════════════
+    function injectRecurringTasks(dateId) {
+        const d = new Date(dateId+'T12:00:00');
+        const dow = d.getDay(); // 0=Sun,1=Mon...6=Sat
+        recurTemplates.forEach(tpl => {
+            if (tpl.until && dateId > tpl.until) return;
+            if (tpl.startDate && dateId < tpl.startDate) return;
+            let matches = false;
+            if (tpl.recur==='daily') matches=true;
+            else if (tpl.recur==='weekdays') matches=dow>=1&&dow<=5;
+            else if (tpl.recur==='weekly') {
+                const sd=new Date(tpl.startDate+'T12:00:00');
+                matches=sd.getDay()===dow;
+            }
+            else if (tpl.recur==='biweekly') {
+                const sd=new Date(tpl.startDate+'T12:00:00');
+                const diff=Math.round((d-sd)/(1000*60*60*24));
+                matches=sd.getDay()===dow && diff%14===0;
+            }
+            else if (tpl.recur==='monthly') {
+                const sd=new Date(tpl.startDate+'T12:00:00');
+                matches=sd.getDate()===d.getDate();
+            }
+            if (!matches) return;
+            // Check if this recurring task already exists for this date
+            const exists=tasks.some(t=>t.recurId===tpl.id && t.date===dateId);
+            if (!exists) {
+                tasks.push({
+                    id: Date.now()+Math.random(),
+                    date: dateId,
+                    text: tpl.text,
+                    color: tpl.color||'#000000',
+                    checked: false,
+                    recurId: tpl.id
+                });
+                save();
+            }
+        });
+    }
+
+    // ═══════════════════════════════════
+    //  DATE PICKER
+    // ═══════════════════════════════════
+    document.getElementById('date-picker').value = formatDate(new Date());
+    function setToday() {
+        document.getElementById('date-picker').value=formatDate(new Date()); renderAll();
+    }
+
+    // ═══════════════════════════════════
+    //  OVERLAYS
+    // ═══════════════════════════════════
+    function toggleOverlay(id) {
+        const el=document.getElementById(id), isOpen=el.style.display==='flex';
+        document.querySelectorAll('.overlay').forEach(o=>o.style.display='none');
+        if (!isOpen) {
+            el.style.display='flex';
+            if (id==='history-overlay')   renderHistory();
+            if (id==='occasions-overlay') { renderOccasionsList(); buildOccasionForm(); }
+            if (id==='settings-overlay')  document.getElementById('import-status').textContent='';
+        }
+    }
+    document.querySelectorAll('.overlay').forEach(ov=>{
+        ov.addEventListener('click',e=>{ if(e.target===ov) ov.style.display='none'; });
+    });
+
+    // ═══════════════════════════════════
+    //  VIEW SWITCH
+    // ═══════════════════════════════════
+    function switchView(viewId,el) {
+        currentView=viewId;
+        document.querySelectorAll('.view-container').forEach(v=>v.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(v=>v.classList.remove('active'));
+        document.getElementById(viewId+'-view').classList.add('active');
+        el.classList.add('active');
+        document.getElementById('daily-controls').style.display=viewId==='daily'?'block':'none';
+        renderAll();
+    }
+
+    // ═══════════════════════════════════
+    //  TASKS — Add with /r shortcut
+    // ═══════════════════════════════════
+    function addTask(dateId, input) {
+        let text = input.value.trim();
+        if (!text) return;
+
+        // /r shortcut → priority
+        let isPriority = false;
+        if (/^\/r\s+/i.test(text)) {
+            isPriority = true;
+            text = text.replace(/^\/r\s+/i,'').trim();
+        }
+        if (!text) return;
+
+        tasks.push({
+            id: Date.now(),
+            date: dateId,
+            text,
+            color: isPriority ? '#ff3b30' : '#000000',
+            checked: false
+        });
+        logAction('Created', text, dateId);
+        input.value='';
+        // hide hint
+        const hint=input.parentElement.querySelector('.shortcut-hint');
+        if (hint) hint.style.display='none';
+        save(); renderAll();
+    }
+
+    function deleteTask(id) {
+        tasks=tasks.filter(x=>x.id!==id); save(); renderAll();
+    }
+
+    // ═══════════════════════════════════
+    //  OCCASIONS
+    // ═══════════════════════════════════
+    function getOccasionsForDate(dateStr) {
+        const [,mm,dd]=dateStr.split('-');
+        return occasions.filter(o=>{
+            if (!o.date) return false;
+            const [,om,od]=o.date.split('-'); return om===mm&&od===dd;
+        });
+    }
+
+    // ═══════════════════════════════════
+    //  RENDER
+    // ═══════════════════════════════════
+    function renderAll() {
+        const dailySel=document.getElementById('date-picker').value;
+
+        // Precompute date ranges per view
+        function getDatesForView(view) {
+            const dates=[];
+            if (view==='daily') {
+                const [y,m,dy]=dailySel.split('-');
+                const d=new Date(+y,+m-1,+dy,12,0,0,0);
+                dates.push(d);
+            } else if (view==='weekly') {
+                for (let i=0;i<7;i++) {
+                    const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+i);
+                    dates.push(d);
+                }
+            } else { // monthly = next 31 days from today
+                for (let i=0;i<31;i++) {
+                    const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+i);
+                    dates.push(d);
+                }
+            }
+            return dates;
+        }
+
+        // Inject recurring tasks for all visible dates
+        ['weekly','daily','monthly'].forEach(view=>{
+            getDatesForView(view).forEach(d=>injectRecurringTasks(formatDate(d)));
+        });
+
+        ['weekly','daily','monthly'].forEach(view=>{
+            const container=document.getElementById(view+'-view');
+            container.innerHTML='';
+            const dates=getDatesForView(view);
+
+            dates.forEach(d=>{
+                const dateId=formatDate(d);
+                let dayTasks=tasks.filter(t=>t.date===dateId);
+
+                // Monthly view: only show priority tasks
+                if (view==='monthly') dayTasks=dayTasks.filter(t=>t.color==='#ff3b30');
+
+                // Monthly: skip day if no priority tasks AND no occasions
+                //const dayOccs=getOccasionsForDate(dateId);
+                //if (view==='monthly' && dayTasks.length===0 && dayOccs.length===0) return;
+                const dayOccs=getOccasionsForDate(dateId);
+
+                // Sort: priority top → unchecked → checked bottom
+                dayTasks.sort((a,b)=>{
+                    // checked always sink to bottom
+                    if (a.checked !== b.checked) return a.checked ? 1 : -1;
+                    // among unchecked: priority floats to top
+                    const ap=a.color==='#ff3b30'?0:1, bp=b.color==='#ff3b30'?0:1;
+                    return ap-bp;
+                });
+
+                const section=document.createElement('div');
+                section.className='day-section';
+
+                // Header
+                const header=document.createElement('div'); header.className='day-header';
+                const nameSpan=document.createElement('span'); nameSpan.className='day-name';
+                nameSpan.textContent=d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+                header.appendChild(nameSpan);
+                dayOccs.forEach(occ=>{
+                    const badge=document.createElement('span'); badge.className='occasion-badge';
+                    badge.style.cssText=`background:${occ.color}22;color:${occ.color};border:1px solid ${occ.color}44`;
+                    // compute age/years if year is set
+                    let label=occ.name;
+                    if (occ.year && (occ.type==='birthday'||occ.type==='anniversary')) {
+                        const thisYear=d.getFullYear();
+                        const years=thisYear - occ.year;
+                        if (years>=0) label+=occ.type==='birthday'?' (turns '+years+')':' ('+years+'yr)';
+                    }
+                    badge.textContent=occ.icon+' '+label; badge.title=label;
+                    header.appendChild(badge);
+                });
+                section.appendChild(header);
+
+                const listDiv=document.createElement('div'); section.appendChild(listDiv);
+
+                // Add input (not on monthly)
+                if (true) {
+                    const hint=document.createElement('div');
+                    hint.className='shortcut-hint'; hint.textContent='↩ to add as priority (/r clears the prefix)';
+
+                    const addInput=document.createElement('input');
+                    addInput.type='text'; addInput.className='add-input';
+                    addInput.placeholder='+ Add task  (type /r for priority)';
+                    addInput.addEventListener('input',()=>{
+                        hint.style.display=/^\/r\s/i.test(addInput.value)?'block':'none';
+                    });
+                    addInput.addEventListener('keydown',e=>{if(e.key==='Enter')addTask(dateId,addInput);});
+                    section.appendChild(hint);
+                    section.appendChild(addInput);
+                }
+
+                container.appendChild(section);
+
+                dayTasks.forEach(t=>{
+                    const item=document.createElement('div');
+                    const isRecur=!!t.recurId;
+                    const isPriority=t.color==='#ff3b30';
+                    item.className='task-item'+(t.checked?' checked':'')+(isPriority?' priority':'')+(isRecur?' recurring-task':'');
+
+                    // Custom circular checkbox
+                    const cb=document.createElement('div');
+                    cb.className='circle-check'+(t.checked?' is-checked':'')+(isPriority?' is-priority':'');
+                    cb.innerHTML=`<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>`;
+                    cb.addEventListener('click',()=>{
+                        t.checked=!t.checked;
+                        if (t.checked) {
+                            const r=cb.getBoundingClientRect();
+                            playBubblePop(r.left+r.width/2,r.top+r.height/2);
+                        }
+                        logAction(t.checked?'Completed':'Unchecked',t.text,t.date);
+                        save(); renderAll();
+                    });
+
+                    const content=document.createElement('div'); content.className='task-content';
+                    const span=document.createElement('span');
+                    span.className='task-text'+(t.checked?' crossed':'');
+                    span.style.color=t.color; span.textContent=t.text;
+                    content.appendChild(span);
+
+                    // Double-click → edit modal; long press → recurring sheet
+                    content.addEventListener('dblclick',()=>openEditModal(t.id));
+                    let pt;
+                    content.addEventListener('touchstart',()=>{ pt=setTimeout(()=>openRecurSheet(t.id),600); },{passive:true});
+                    content.addEventListener('touchend', ()=>clearTimeout(pt));
+                    content.addEventListener('touchmove',()=>clearTimeout(pt));
+                    // Desktop: right-click → edit modal
+                    content.addEventListener('contextmenu',e=>{ e.preventDefault(); openEditModal(t.id); });
+
+                    // Visible repeat/recurring button
+                    const recurBtn=document.createElement('button');
+                    recurBtn.className='delete-btn recur-btn';
+                    recurBtn.setAttribute('aria-label','Set recurring');
+                    recurBtn.title='Set recurring';
+                    const isRecurring=!!t.recurId;
+                    recurBtn.style.color=isRecurring?'var(--apple-blue)':'#d1d1d6';
+                    recurBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <polyline points="1 20 1 14 7 14"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>`;
+                    recurBtn.addEventListener('click',e=>{ e.stopPropagation(); openRecurSheet(t.id); });
+
+                    const del=document.createElement('button'); del.className='delete-btn'; del.setAttribute('aria-label','Delete');
+                    del.innerHTML=`<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="1" y1="1" x2="10" y2="10"/><line x1="10" y1="1" x2="1" y2="10"/></svg>`;
+                    del.addEventListener('click',()=>deleteTask(t.id));
+
+                    item.appendChild(cb); item.appendChild(content); item.appendChild(recurBtn); item.appendChild(del);
+                    listDiv.appendChild(item);
+                });
+            }); // end dates.forEach
+        }); // end views.forEach
+        updateProgressBar();
+    }
+
+    // ═══════════════════════════════════
+    //  RECURRING SHEET
+    // ═══════════════════════════════════
+    function openRecurSheet(taskId) {
+        recurTaskId=taskId;
+        const t=tasks.find(x=>x.id===taskId); if (!t) return;
+        document.getElementById('recur-task-name').textContent='"'+t.text+'"';
+
+        // find existing template
+        const tpl=t.recurId ? recurTemplates.find(r=>r.id===t.recurId) : null;
+
+        // reset options
+        document.querySelectorAll('.recur-opt').forEach(o=>o.classList.remove('selected'));
+        if (tpl) {
+            const opt=document.querySelector(`.recur-opt[data-val="${tpl.recur}"]`);
+            if (opt) opt.classList.add('selected');
+            document.getElementById('recur-until').value=tpl.until||'';
+        } else {
+            document.querySelector('.recur-opt[data-val="none"]').classList.add('selected');
+            document.getElementById('recur-until').value='';
+        }
+
+        document.getElementById('recur-remove-btn').style.display=tpl?'block':'none';
+
+        document.getElementById('recur-bg').classList.add('open');
+        setTimeout(()=>document.getElementById('recur-sheet').classList.add('open'),10);
+    }
+
+    function closeRecurSheet() {
+        document.getElementById('recur-sheet').classList.remove('open');
+        setTimeout(()=>document.getElementById('recur-bg').classList.remove('open'),320);
+    }
+
+    document.querySelectorAll('.recur-opt').forEach(opt=>{
+        opt.addEventListener('click',()=>{
+            document.querySelectorAll('.recur-opt').forEach(o=>o.classList.remove('selected'));
+            opt.classList.add('selected');
+        });
+    });
+
+    function saveRecurring() {
+        const t=tasks.find(x=>x.id===recurTaskId); if (!t) return closeRecurSheet();
+        const selected=document.querySelector('.recur-opt.selected');
+        const recurVal=selected?selected.dataset.val:'none';
+        const until=document.getElementById('recur-until').value||null;
+
+        if (recurVal==='none') {
+            // remove template if any
+            if (t.recurId) { recurTemplates=recurTemplates.filter(r=>r.id!==t.recurId); t.recurId=undefined; }
+        } else {
+            if (t.recurId) {
+                // update existing
+                const tpl=recurTemplates.find(r=>r.id===t.recurId);
+                if (tpl) { tpl.recur=recurVal; tpl.until=until; tpl.text=t.text; tpl.color=t.color; }
+            } else {
+                // create new template
+                const tplId=Date.now();
+                recurTemplates.push({ id:tplId, text:t.text, color:t.color, recur:recurVal, startDate:t.date, until });
+                t.recurId=tplId;
+            }
+        }
+        save(); renderAll(); closeRecurSheet();
+    }
+
+    function removeRecurring() {
+        const t=tasks.find(x=>x.id===recurTaskId); if (!t) return closeRecurSheet();
+        if (t.recurId) {
+            // remove all future recurring instances, keep current
+            tasks=tasks.filter(x=>!(x.recurId===t.recurId && x.date>t.date));
+            recurTemplates=recurTemplates.filter(r=>r.id!==t.recurId);
+            t.recurId=undefined;
+        }
+        save(); renderAll(); closeRecurSheet();
+    }
+
+    // ═══════════════════════════════════
+    //  PROGRESS BAR
+    // ═══════════════════════════════════
+    function updateProgressBar() {
+        const date=document.getElementById('date-picker').value;
+        const dayTasks=tasks.filter(t=>t.date===date);
+        const pct=dayTasks.length===0?0:Math.round(dayTasks.filter(t=>t.checked).length/dayTasks.length*100);
+        document.getElementById('progress-fill').style.width=pct+'%';
+        document.getElementById('progress-fill').style.backgroundColor=pct<=25?'#FF0033':pct<=50?'#FF6600':pct<=75?'#FFFF00':'#33FF00';
+        document.getElementById('progress-text').textContent=pct+'%';
+        if (pct===100&&lastPercent<100) startBalloonCelebration();
+        lastPercent=pct;
+    }
+
+    // ═══════════════════════════════════
+    //  BALLOONS
+    // ═══════════════════════════════════
+    function startBalloonCelebration() {
+        const end=Date.now()+15000;
+        const iv=setInterval(()=>{ if(Date.now()>end)return clearInterval(iv); createBalloon(); },300);
+    }
+    function createBalloon() {
+        const b=document.createElement('div'); b.className='balloon';
+        const x=Math.random()*90+5; b.style.left=x+'vw';
+        b.style.backgroundColor=`hsl(${Math.random()*360},70%,60%)`;
+        document.body.appendChild(b);
+        b.animate([{bottom:'-60px',left:x+'vw'},{bottom:'110vh',left:(x+(Math.random()-0.5)*40)+'vw'}],{duration:4000+Math.random()*3000,easing:'linear'}).onfinish=()=>b.remove();
+    }
+
+    // ═══════════════════════════════════
+    //  EDIT MODAL
+    // ═══════════════════════════════════
+    function openEditModal(id) {
+        currentTaskId=id;
+        const t=tasks.find(x=>x.id===id);
+        document.getElementById('modal-task-text').textContent=t.text;
+        document.getElementById('edit-overlay').style.display='flex';
+        setTimeout(()=>{
+            const el=document.getElementById('modal-task-text'); el.focus();
+            const r=document.createRange(); r.selectNodeContents(el); r.collapse(false);
+            const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        },100);
+    }
+    function applyQuickRed() { const t=tasks.find(x=>x.id===currentTaskId); if(t)t.color='#ff3b30'; closeEditModal(); }
+    function closeEditModal() {
+        const t=tasks.find(x=>x.id===currentTaskId);
+        if (t) { const txt=document.getElementById('modal-task-text').textContent.trim(); if(txt)t.text=txt; }
+        document.getElementById('edit-overlay').style.display='none'; save(); renderAll();
+    }
+
+    // ═══════════════════════════════════
+    //  HISTORY
+    // ═══════════════════════════════════
+    function renderHistory() {
+        const list=document.getElementById('history-list');
+        if (!history.length) { list.innerHTML='<p style="color:var(--sub);margin-top:12px;">No activity yet.</p>'; return; }
+        list.innerHTML=history.map(h=>`<div class="history-row"><div><span class="hist-type">${h.action}</span><span style="color:var(--sub);font-size:11px;margin-left:8px;">${h.date} · ${h.time}</span></div><div style="font-weight:600;margin-top:3px;word-break:break-word;">${h.text}</div></div>`).join('');
+    }
+
+    // ═══════════════════════════════════
+    //  SETTINGS
+    // ═══════════════════════════════════
+    function exportData() {
+        const blob=new Blob([JSON.stringify({tasks,history,occasions,recurTemplates},null,2)],{type:'application/json'});
+        const url=URL.createObjectURL(blob); const a=document.createElement('a');
+        a.href=url; a.download=`planner-${formatDate(new Date())}.json`; a.click(); URL.revokeObjectURL(url);
+    }
+    function triggerImport() { document.getElementById('import-file-input').click(); }
+    function importData(event) {
+        const file=event.target.files[0]; if(!file)return;
+        const reader=new FileReader();
+        reader.onload=e=>{
+            const status=document.getElementById('import-status');
+            try {
+                const data=JSON.parse(e.target.result); let imported=0;
+                if (Array.isArray(data.tasks)) { const ids=new Set(tasks.map(t=>t.id)); data.tasks.forEach(t=>{ if(!ids.has(t.id)){tasks.push(t);imported++;} }); }
+                if (Array.isArray(data.history)) history=data.history;
+                if (Array.isArray(data.occasions)) { const ids=new Set(occasions.map(o=>o.id)); data.occasions.forEach(o=>{ if(!ids.has(o.id))occasions.push(o); }); }
+                if (Array.isArray(data.recurTemplates)) { const ids=new Set(recurTemplates.map(r=>r.id)); data.recurTemplates.forEach(r=>{ if(!ids.has(r.id))recurTemplates.push(r); }); }
+                save(); renderAll();
+                status.style.color='#34c759'; status.textContent=`✓ Imported ${imported} task${imported!==1?'s':''} successfully.`;
+            } catch { status.style.color='#ff3b30'; status.textContent='✗ Invalid JSON file — please try again.'; }
+            event.target.value='';
+        };
+        reader.readAsText(file);
+    }
+    function clearAllData() {
+        if (!confirm('Clear ALL tasks, history, occasions, and recurring rules?')) return;
+        tasks=[];history=[];occasions=[];recurTemplates=[];
+        save();renderAll();toggleOverlay('settings-overlay');
+    }
+
+    // ═══════════════════════════════════
+    //  OCCASIONS
+    // ═══════════════════════════════════
+    function buildOccasionForm() {
+        const ip=document.getElementById('occ-icon-picker'); ip.innerHTML='';
+        OCC_ICONS.forEach(icon=>{
+            const el=document.createElement('div'); el.className='icon-option'+(icon===selIcon?' selected':''); el.textContent=icon;
+            el.addEventListener('click',()=>{ selIcon=icon; document.querySelectorAll('.icon-option').forEach(x=>x.classList.remove('selected')); el.classList.add('selected'); });
+            ip.appendChild(el);
+        });
+        const cp=document.getElementById('occ-color-picker'); cp.innerHTML='';
+        OCC_COLORS.forEach(color=>{
+            const el=document.createElement('div'); el.className='color-option'+(color===selColor?' selected':''); el.style.background=color;
+            el.addEventListener('click',()=>{ selColor=color; document.querySelectorAll('.color-option').forEach(x=>x.classList.remove('selected')); el.classList.add('selected'); });
+            cp.appendChild(el);
+        });
+    }
+    function renderOccasionsList() {
+        const list=document.getElementById('occasions-list');
+        if (!occasions.length) { list.innerHTML='<p style="color:var(--sub);font-size:14px;margin:0 0 8px;">No occasions yet. Add one below.</p>'; return; }
+        const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const thisYear=new Date().getFullYear();
+        const sorted=[...occasions].sort((a,b)=>{ const [,am,ad]=(a.date||'').split('-'),[,bm,bd]=(b.date||'').split('-'); return(+am*100+ +ad)-(+bm*100+ +bd); });
+        list.innerHTML='';
+        sorted.forEach(occ=>{
+            const item=document.createElement('div'); item.className='occasion-item';
+            const pill=document.createElement('div'); pill.className='occasion-icon-pill'; pill.style.background=occ.color+'22'; pill.textContent=occ.icon;
+            const info=document.createElement('div'); info.className='occasion-info';
+            const [,mm,dd]=(occ.date||'').split('-');
+            const dl=mm&&dd?`${MONTHS[+mm-1]} ${+dd}`:'';
+            // build age/years label
+            let ageLine='';
+            if (occ.year && (occ.type==='birthday'||occ.type==='anniversary')) {
+                const n=thisYear-occ.year;
+                if (n>=0) ageLine=occ.type==='birthday'?` · turns ${n}`  :` · ${n} year${n===1?'':'s'}`;
+            }
+            const typeLabel=occ.type==='birthday'?'Birthday':occ.type==='anniversary'?'Anniversary':'';
+            const meta=[dl+(ageLine), typeLabel].filter(Boolean).join(' · ');
+            info.innerHTML=`<div class="occasion-name" style="color:${occ.color}">${occ.name}</div><div class="occasion-meta">${meta}</div>`;
+            const editBtn=document.createElement('button'); editBtn.className='delete-btn'; editBtn.style.color='#8e8e93'; editBtn.setAttribute('aria-label','Edit');
+            editBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+            editBtn.addEventListener('click',()=>startEditOccasion(occ.id));
+            const delBtn=document.createElement('button'); delBtn.className='delete-btn'; delBtn.setAttribute('aria-label','Delete');
+            delBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="1" y1="1" x2="10" y2="10"/><line x1="10" y1="1" x2="1" y2="10"/></svg>`;
+            delBtn.addEventListener('click',()=>{ occasions=occasions.filter(o=>o.id!==occ.id); save();renderAll();renderOccasionsList(); });
+            item.appendChild(pill);item.appendChild(info);item.appendChild(editBtn);item.appendChild(delBtn);
+            list.appendChild(item);
+        });
+    }
+    function startEditOccasion(id) {
+        const occ=occasions.find(o=>o.id===id); if(!occ)return;
+        editingOccId=id;
+        document.getElementById('occ-name').value=occ.name;
+        document.getElementById('occ-date').value=occ.date;
+        document.getElementById('occ-year').value=occ.year||'';
+        // restore type
+        const type=occ.type||'other';
+        document.querySelectorAll('.type-opt').forEach(o=>o.classList.remove('selected'));
+        const typeEl=document.querySelector(`.type-opt[data-val="${type}"]`);
+        if(typeEl) typeEl.classList.add('selected');
+        document.getElementById('occ-year-group').style.display=(type==='birthday'||type==='anniversary')?'block':'none';
+        selIcon=occ.icon; selColor=occ.color;
+        document.getElementById('occasion-form-title').textContent='Edit';
+        buildOccasionForm(); document.getElementById('occasion-form').scrollIntoView({behavior:'smooth'});
+    }
+    function selectOccType(el) {
+        document.querySelectorAll('.type-opt').forEach(o=>o.classList.remove('selected'));
+        el.classList.add('selected');
+        // show/hide year field
+        const type=el.dataset.val;
+        document.getElementById('occ-year-group').style.display=(type==='birthday'||type==='anniversary')?'block':'none';
+    }
+
+    function saveOccasion() {
+        const name=document.getElementById('occ-name').value.trim(), date=document.getElementById('occ-date').value;
+        if (!name||!date) { alert('Please fill in both name and date.'); return; }
+        const typeEl=document.querySelector('.type-opt.selected');
+        const type=typeEl?typeEl.dataset.val:'other';
+        const yearVal=document.getElementById('occ-year').value.trim();
+        const year=yearVal?parseInt(yearVal):null;
+        if (editingOccId) { const occ=occasions.find(o=>o.id===editingOccId); if(occ)Object.assign(occ,{name,date,icon:selIcon,color:selColor,type,year}); editingOccId=null; }
+        else occasions.push({id:Date.now(),name,date,icon:selIcon,color:selColor,type,year});
+        resetOccasionForm(); save();renderAll();renderOccasionsList();
+    }
+    function cancelOccasionEdit() { editingOccId=null; resetOccasionForm(); }
+    function resetOccasionForm() {
+        document.getElementById('occ-name').value='';
+        document.getElementById('occ-date').value='';
+        document.getElementById('occ-year').value='';
+        document.querySelectorAll('.type-opt').forEach(o=>o.classList.remove('selected'));
+        document.querySelector('.type-opt[data-val="birthday"]').classList.add('selected');
+        document.getElementById('occ-year-group').style.display='block';
+        selIcon=OCC_ICONS[0]; selColor=OCC_COLORS[0];
+        document.getElementById('occasion-form-title').textContent='Add New';
+        buildOccasionForm();
+    }
+
+    // ═══════════════════════════════════
+    //  INIT
+    // ═══════════════════════════════════
+    buildOccasionForm();
+    renderAll();
+    </script>
+</body>
+</html>
